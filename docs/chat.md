@@ -51,6 +51,12 @@ getItemKey: (index) => messages[index]!.id
 
 Do not use index keys for chat history. After a prepend, every existing message shifts to a new index, so index keys cannot identify the same message across the update.
 
+If you render a loading spinner (or other placeholder) as a real list item at the top while older history is fetched, mark it with [`isValidAnchorItem`](api/virtualizer#isvalidanchoritem) so it is never chosen as the prepend anchor. Its key disappears when the batch replaces it, and anchoring on it would jump the list to the top.
+
+```tsx
+isValidAnchorItem: (item) => item.key !== 'loading-spinner'
+```
+
 ### Follow appended output only when pinned
 
 Set `followOnAppend` to keep the viewport pinned to the end when a new message arrives and the user was already at the end.

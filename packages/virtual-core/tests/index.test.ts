@@ -8,6 +8,7 @@ import {
   observeWindowOffset,
   windowScroll,
 } from '../src/index'
+import type { VirtualizerOptions } from '../src/index'
 
 test('should export the Virtualizer class', () => {
   expect(Virtualizer).toBeDefined()
@@ -1641,6 +1642,73 @@ test('iOS deferral: flushed delta is rolled into scrollAdjustments so back-to-ba
     // the correct effective offset.
     expect(v['scrollAdjustments']).toBe(50)
   })
+})
+
+test("anchorTo:'end' skips an invalid sentinel anchor item on prepend", () => {
+  // A leading placeholder row (e.g. a loading spinner) sits under the scroll
+  // offset at the top of the list. When older history is prepended the
+  // placeholder is dropped, so its key does not survive the update: anchoring
+  // on it would leave the prepend uncompensated and jump the list to the top.
+  // `isValidAnchorItem` lets the consumer reject the placeholder so the
+  // virtualizer anchors on the nearest real item one index inward, whose key
+  // persists across the update, keeping the read position stable.
+
+  // 50px rows. Before: a spinner at index 0 followed by four messages, with the
+  // viewport at the very top (offset 10 is inside the spinner's [0, 50)). After:
+  // three older messages prepended and the spinner dropped. Two distinct key
+  // arrays keep the pre- and post-update key functions independent.
+  const before = ['spinner', 'a', 'b', 'c', 'd']
+  const after = ['x', 'y', 'z', 'a', 'b', 'c', 'd']
+  const makeVirtualizer = (
+    opts: Partial<VirtualizerOptions<any, any>> = {},
+  ): Virtualizer<any, any> =>
+    new Virtualizer({
+      count: before.length,
+      estimateSize: () => 50,
+      anchorTo: 'end',
+      getItemKey: (i) => before[i]!,
+      getScrollElement: () =>
+        ({
+          scrollTop: 10,
+          scrollLeft: 0,
+          scrollHeight: 100000,
+          clientHeight: 200,
+          offsetHeight: 200,
+        }) as any,
+      scrollToFn: () => {},
+      observeElementRect: () => {},
+      observeElementOffset: (_inst, cb) => {
+        cb(10, false)
+        return () => {}
+      },
+      ...opts,
+    })
+
+  const prepend = (v: Virtualizer<any, any>): void =>
+    v.setOptions({
+      ...v.options,
+      count: after.length,
+      getItemKey: (i) => after[i]!,
+    })
+
+  // Baseline (no isValidAnchorItem): the anchor is the spinner, whose key is
+  // gone after the prepend, so the offset is left uncompensated — the jump.
+  const baseline = makeVirtualizer()
+  baseline._willUpdate()
+  baseline['getMeasurements']() // 'a' starts at 50
+  prepend(baseline)
+  expect(baseline.scrollOffset).toBe(10)
+
+  // With isValidAnchorItem rejecting the spinner: the anchor becomes 'a'. It
+  // moved from start 50 to start 150 (+100 prepended), so the offset re-pins to
+  // 110 and 'a' stays 40px below the viewport top — no jump.
+  const fixed = makeVirtualizer({
+    isValidAnchorItem: (item) => item.key !== 'spinner',
+  })
+  fixed._willUpdate()
+  fixed['getMeasurements']()
+  prepend(fixed)
+  expect(fixed.scrollOffset).toBe(110)
 })
 
 test('iOS deferral: a negative delta at the end clamp is dropped, not replayed', () => {

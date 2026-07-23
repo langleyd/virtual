@@ -360,6 +360,7 @@ export interface VirtualizerOptions<
   initialMeasurementsCache?: Array<VirtualItem>
   lanes?: number
   anchorTo?: ScrollAnchor
+  isValidAnchorItem?: (item: VirtualItem) => boolean
   followOnAppend?: FollowOnAppend
   scrollEndThreshold?: number
   isScrollingResetDelay?: number
@@ -594,11 +595,33 @@ export class Virtualizer<
 
       if (didEdgeKeysChange) {
         edgeKeysChanged = true
-        const item =
+        let item =
           prevCount > 0
             ? (this.getVirtualItemForOffset(this.getScrollOffset()) ??
               measurements[0])
             : null
+
+        // The end-anchor re-pin restores the item under the current offset by
+        // its key. If the consumer rejects that item via `isValidAnchorItem`
+        // — e.g. a transient placeholder row (loading spinner, "load more",
+        // skeleton) whose key does not survive the update — restoring it by key
+        // would fail and the prepend would go uncompensated, jumping the list to
+        // the edge. Such rows only sit at the extreme edges, so step one index
+        // inward to the nearest accepted item, whose key persists.
+        const isValidAnchorItem = merged.isValidAnchorItem
+        if (item && isValidAnchorItem && !isValidAnchorItem(item)) {
+          const step = item.index === 0 ? 1 : -1
+          let i = item.index
+          while (
+            i >= 0 &&
+            i < measurements.length &&
+            measurements[i] &&
+            !isValidAnchorItem(measurements[i]!)
+          ) {
+            i += step
+          }
+          item = measurements[i] ?? item
+        }
 
         if (item) {
           anchor = [item.key, this.getScrollOffset() - item.start]

@@ -259,6 +259,23 @@ Set `anchorTo: 'end'` for chat, logs, and reverse/inverted feeds. In end-anchore
 
 For prepend stability, use a stable `getItemKey` based on each item's persistent id. Index keys cannot distinguish prepends from appends after items shift.
 
+### `isValidAnchorItem`
+
+```tsx
+isValidAnchorItem?: (item: VirtualItem) => boolean
+```
+
+**Default:** `undefined`
+
+Used with `anchorTo: 'end'`. When list edges change, the virtualizer anchors on the item under the current scroll offset and restores it by key after the update. Return `false` here to reject an item as an anchor candidate; the virtualizer then anchors on the nearest accepted item one index inward from the edge.
+
+This is for transient placeholder rows rendered at the extreme edges — loading spinners, "load more" rows, skeletons — whose key does not survive the next update. If such a row is the anchor, restoring it by key fails and the prepend is left uncompensated, jumping the list to the edge. Rejecting it keeps the anchor on a real item whose key persists.
+
+```tsx
+// Skip a leading loading spinner rendered as the first item.
+isValidAnchorItem: (item) => item.key !== 'loading-spinner'
+```
+
 ### `followOnAppend`
 
 ```tsx

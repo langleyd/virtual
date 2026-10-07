@@ -12,15 +12,22 @@ const ESTIMATE = 50
 
 const App = () => {
   const parentRef = React.useRef<HTMLDivElement>(null)
-  const initialOffset = Number(
-    new URLSearchParams(window.location.search).get('initialOffset') ?? 0,
-  )
+  const params = new URLSearchParams(window.location.search)
+  const initialOffset = Number(params.get('initialOffset') ?? 0)
+  const overscan = Number(params.get('overscan') ?? 1)
+  const adjustOnBackwardScroll = params.has('adjustOnBackwardScroll')
+  const [grownBy, setGrownBy] = React.useState<Record<number, number>>({})
   const rowVirtualizer = useVirtualizer({
     count: 1000,
     getScrollElement: () => parentRef.current,
     estimateSize: () => ESTIMATE,
     initialOffset,
+    overscan,
+    adjustOnBackwardScroll,
   })
+  // Lets a test grow a row after it was measured, like an image loading in it.
+  ;(window as any).__growRow = (index: number, by: number) =>
+    setGrownBy((current) => ({ ...current, [index]: by }))
 
   return (
     <div
@@ -48,7 +55,9 @@ const App = () => {
               width: '100%',
             }}
           >
-            <div style={{ height: ITEM_SIZE }}>Row {v.index}</div>
+            <div style={{ height: ITEM_SIZE + (grownBy[v.index] ?? 0) }}>
+              Row {v.index}
+            </div>
           </div>
         ))}
       </div>

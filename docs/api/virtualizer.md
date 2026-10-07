@@ -287,6 +287,16 @@ scrollEndThreshold?: number
 
 The pixel threshold used by `isAtEnd()` and `followOnAppend` to decide whether the viewport is close enough to the end to count as pinned.
 
+### `adjustOnBackwardScroll`
+
+```tsx
+adjustOnBackwardScroll?: boolean
+```
+
+**Default:** `false`
+
+By default, when an item above the viewport changes size again after it was first measured, the virtualizer skips the scroll-position adjustment while the user is scrolling backward. Set this to `true` to adjust in either direction, so that content finishing loading above the viewport (an image, an embed) does not shift the items being read. Items measured for the first time are adjusted in either direction regardless.
+
 ### `isScrollingResetDelay`
 
 ```tsx
@@ -584,7 +594,7 @@ Current `Rect` of the scroll element.
 shouldAdjustScrollPositionOnItemSizeChange: undefined | ((item: VirtualItem, delta: number, instance: Virtualizer<TScrollElement, TItemElement>) => boolean)
 ```
 
-Provides fine-grained control over the scroll-position adjustment that fires when an above-viewport item's measured size differs from its estimated size. By default the virtualizer applies this correction only when the user is **not** scrolling backward, which avoids the well-known "items jump while scrolling up" jank. Supply this callback only if you want to override that default — for example, to apply corrections during backward scroll, or to skip them in additional scenarios.
+Provides fine-grained control over the scroll-position adjustment that fires when an above-viewport item's measured size differs from its estimated size. By default the virtualizer applies this correction only when the user is **not** scrolling backward, which avoids the well-known "items jump while scrolling up" jank. Supply this callback only if you want to override that default — for example, to skip corrections in additional scenarios. To apply corrections during backward scroll, set [`adjustOnBackwardScroll`](#adjustonbackwardscroll) instead.
 
 This is a virtualizer instance property, not a `VirtualizerOptions` option. Assign it directly on the virtualizer instance after creating the virtualizer:
 

@@ -393,6 +393,7 @@ export interface VirtualizerOptions<
   anchorTo?: ScrollAnchor
   followOnAppend?: FollowOnAppend
   scrollEndThreshold?: number
+  adjustOnBackwardScroll?: boolean
   isScrollingResetDelay?: number
   useScrollendEvent?: boolean
   enabled?: boolean
@@ -809,6 +810,7 @@ export class Virtualizer<
       anchorTo: 'start',
       followOnAppend: false,
       scrollEndThreshold: 1,
+      adjustOnBackwardScroll: false,
       isScrollingResetDelay: 150,
       enabled: true,
       isRtl: false,
@@ -2098,9 +2100,10 @@ export class Virtualizer<
           // changes size *below* the anchor point, so shifting scrollTop by the
           // delta would drag the viewport downward on every growth (#1218).
           // Also skip during backward scroll to avoid the "items jump while
-          // scrolling up" cascade.
+          // scrolling up" cascade, unless `adjustOnBackwardScroll` opts in.
           itemStart + itemSize <= scrollOffset &&
-          this.scrollDirection !== 'backward'
+          (this.options.adjustOnBackwardScroll ||
+            this.scrollDirection !== 'backward')
       const shouldAdjustScroll =
         !isSmoothScroll(this.scrollState) &&
         (this.shouldAdjustScrollPositionOnItemSizeChange !== undefined

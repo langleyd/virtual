@@ -96,3 +96,48 @@ test('anchored item stays stable when scrolling up into unmeasured items', async
     })
     .toBeLessThan(8)
 })
+
+// An already-measured row above the viewport grows while the user scrolls up
+// (an image or embed finishing loading). With adjustOnBackwardScroll the
+// adjustment still applies, so the rows being read do not shift.
+test('anchored item stays stable when a measured row above it grows while scrolling up with adjustOnBackwardScroll', async ({
+  page,
+}) => {
+  await page.goto(
+    '/scroll-anchor/?initialOffset=10000&overscan=3&adjustOnBackwardScroll',
+  )
+  await expect.poll(() => page.evaluate(maxRowGap)).toBeLessThan(1)
+
+  const anchor = await page.evaluate(pickAnchor)
+
+  const SCROLL_UP = 10
+  await page.evaluate(async (delta) => {
+    const container = document.querySelector('#scroll-container')
+    if (!container) throw new Error('Container not found')
+    const containerTop = container.getBoundingClientRect().top
+    // A row already rendered and measured that stays entirely above the
+    // viewport after the scroll below.
+    const row = Array.from(container.querySelectorAll('[data-index]')).find(
+      (el) => el.getBoundingClientRect().bottom < containerTop - 2 * delta,
+    )
+    if (!row) throw new Error('No measured row above the viewport')
+
+    container.scrollTop -= delta
+    // Grow once the scroll event has landed, while the scroll is backward.
+    await new Promise(requestAnimationFrame)
+    const height = row.getBoundingClientRect().height
+    ;(window as any).__growRow(Number(row.getAttribute('data-index')), 40)
+    // Return only once the growth has rendered and been measured.
+    while (row.getBoundingClientRect().height < height + 40) {
+      await new Promise(requestAnimationFrame)
+    }
+    await new Promise(requestAnimationFrame)
+  }, SCROLL_UP)
+
+  await expect
+    .poll(async () => {
+      const top = await page.evaluate(topOfIndex, anchor.index)
+      return top === null ? Infinity : Math.abs(top - (anchor.top + SCROLL_UP))
+    })
+    .toBeLessThan(2)
+})

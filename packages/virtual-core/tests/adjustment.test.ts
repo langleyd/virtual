@@ -48,6 +48,48 @@ test('scroll-up jank: backward-scroll skips adjustment on re-measurement by defa
   expect(scrollToFn).not.toHaveBeenCalled()
 })
 
+test('scroll-up jank: adjustOnBackwardScroll applies adjustment on re-measurement during backward scroll', () => {
+  // Opted in: an already-measured item above the viewport resizes again while
+  // scrolling backward (e.g. an image inside it loaded) and is adjusted for.
+  const scrollToFn = vi.fn()
+  let scrollCb: ((o: number, s: boolean) => void) | null = null
+  const v = new Virtualizer({
+    count: 10,
+    estimateSize: () => 50,
+    getScrollElement: () =>
+      ({
+        scrollTop: 200,
+        scrollLeft: 0,
+        scrollHeight: 500,
+        clientHeight: 200,
+        offsetHeight: 200,
+      }) as any,
+    scrollToFn,
+    adjustOnBackwardScroll: true,
+    observeElementRect: () => {},
+    observeElementOffset: (_inst, cb) => {
+      scrollCb = cb
+      // Simulate user starting at scrollTop=200, then scrolling up to 100.
+      cb(200, false)
+      return () => {}
+    },
+  })
+  v._willUpdate()
+  v['getMeasurements']()
+  // Seed item 0's size so the backward resize below is a RE-measurement.
+  v.resizeItem(0, 80)
+  // Now simulate backward scroll: from 200 to 100 (offset decreases).
+  scrollCb!(100, true)
+  expect(v.scrollDirection).toBe('backward')
+  scrollToFn.mockClear()
+
+  // Re-measure an above-viewport item while scrolling backward.
+  v.resizeItem(0, 100) // item 0 grows by 20px
+
+  expect(scrollToFn).toHaveBeenCalledTimes(1)
+  expect(scrollToFn.mock.calls[0]![1].adjustments).toBe(20)
+})
+
 test('scroll-up jank: backward-scroll still applies adjustment on first measurement', () => {
   // First measurement is special: the item was rendered at its estimate and is
   // now reporting its actual size. That estimate→actual delta lives above the
